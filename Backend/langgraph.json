@@ -1,0 +1,7 @@
+{
+    "dependencies": ["."],
+    "graphs": {
+        "agent": "graph:workflow",
+        "business_analysis": "graph:business_analysis_app"
+    }
+}
