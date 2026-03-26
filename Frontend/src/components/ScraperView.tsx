@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Info, Mail, Building2, Copy, Check, Globe, Loader2 } from "lucide-react";
+import { Info, Mail, Building2, Copy, Check, Globe, Loader2, Send } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from "framer-motion";
 interface ScraperViewProps {
   url: string;
   onUrlChange: (value: string) => void;
+  email: string;
+  onEmailChange: (value: string) => void;
   onSubmit: () => void;
   isLoading: boolean;
   result: {
@@ -15,6 +17,7 @@ interface ScraperViewProps {
     profile_data: string | null;
     target_url: string;
     run_id: string | null;
+    email_sent_status: string | null;
   } | null;
 }
 
@@ -41,6 +44,8 @@ function CopyButton({ text }: { text: string }) {
 export function ScraperView({
   url,
   onUrlChange,
+  email,
+  onEmailChange,
   onSubmit,
   isLoading,
   result,
@@ -66,9 +71,29 @@ export function ScraperView({
             value={url}
             onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && url.trim() && !isLoading) onSubmit();
+              if (e.key === "Enter" && url.trim() && email.trim() && !isLoading) onSubmit();
             }}
           />
+        </div>
+
+        <div className="mt-4">
+          <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+            <Mail size={14} className="text-indigo-500" />
+            Email del Destinatario
+          </label>
+          <Input
+            className="mt-2"
+            type="email"
+            placeholder="Ej: contacto@empresa.com"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && url.trim() && email.trim() && !isLoading) onSubmit();
+            }}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            El cold email generado se enviara automaticamente a esta direccion
+          </p>
         </div>
 
         <Alert className="mt-6 border-amber-300/40 bg-amber-50 text-amber-900">
@@ -84,7 +109,7 @@ export function ScraperView({
 
         <Button
           onClick={onSubmit}
-          disabled={isLoading || !url.trim()}
+          disabled={isLoading || !url.trim() || !email.trim()}
           className="mt-6 w-full bg-indigo-500 hover:bg-indigo-400 text-white font-semibold py-5 text-base shadow-md shadow-indigo-500/20 disabled:opacity-50"
         >
           {isLoading ? (
@@ -170,6 +195,18 @@ export function ScraperView({
                   </p>
                 </div>
               </div>
+
+              {/* Estado de envío de email */}
+              {result.email_sent_status && (
+                <div className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${
+                  result.email_sent_status.startsWith("Email enviado")
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+                }`}>
+                  <Send size={14} />
+                  {result.email_sent_status}
+                </div>
+              )}
 
               {/* Cold Email */}
               <motion.div

@@ -45,6 +45,8 @@ class SalesState(TypedDict, total=False):
     my_service_info: str
     company_tone: str
     final_email: str
+    recipient_email: str
+    email_sent_status: str
 
 
 # --- Construcción del grafo ---

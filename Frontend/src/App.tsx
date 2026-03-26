@@ -10,18 +10,20 @@ interface ProcessResult {
   profile_data: string | null;
   target_url: string;
   run_id: string | null;
+  email_sent_status: string | null;
 }
 
 function App() {
   const [activeNav, setActiveNav] = useState("scraper");
   const [url, setUrl] = useState("");
+  const [email, setEmail] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [headers, setHeaders] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ProcessResult | null>(null);
 
   const handleSubmit = async () => {
-    if (!url.trim()) return;
+    if (!url.trim() || !email.trim()) return;
 
     setIsLoading(true);
     setResult(null);
@@ -30,7 +32,7 @@ function App() {
       const response = await fetch(`${API_BASE}/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_url: url }),
+        body: JSON.stringify({ target_url: url, recipient_email: email }),
       });
 
       if (!response.ok) {
@@ -55,6 +57,8 @@ function App() {
       <ScraperView
         url={url}
         onUrlChange={setUrl}
+        email={email}
+        onEmailChange={setEmail}
         onSubmit={handleSubmit}
         isLoading={isLoading}
         result={result}

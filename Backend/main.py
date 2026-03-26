@@ -42,6 +42,7 @@ app.add_middleware(
 
 class ProcessRequest(BaseModel):
     target_url: str = Field(..., description="URL del sitio web a analizar")
+    recipient_email: str = Field(..., description="Email del destinatario para enviar el cold email generado")
     max_crawl_pages: int = Field(10, ge=1, le=50, description="Máximo de páginas a rastrear")
     max_crawl_depth: int = Field(3, ge=1, le=10, description="Profundidad del crawl (1-10). Default: 3")
     skip_cleaning: bool = Field(True, description="Si True, salta limpieza LLM (más rápido). Si False, limpia con OpenAI")
@@ -60,8 +61,9 @@ class ProcessResponse(BaseModel):
     profile_data: str | None = None
     target_url: str
     run_id: str | None = None
+    email_sent_status: str | None = None
 
-
+# Primer endpoint
 @app.post("/process", response_model=ProcessResponse)
 def process_url(request: ProcessRequest):
     """
@@ -73,6 +75,7 @@ def process_url(request: ProcessRequest):
         inputs = {
             "run_id": run_id,
             "target_url": request.target_url,
+            "recipient_email": request.recipient_email,
             "max_crawl_pages": request.max_crawl_pages,
             "max_crawl_depth": request.max_crawl_depth,
             "skip_cleaning": request.skip_cleaning,
@@ -89,13 +92,14 @@ def process_url(request: ProcessRequest):
             profile_data=result.get("profile_data"),
             target_url=result.get("target_url", request.target_url),
             run_id=run_id,
+            email_sent_status=result.get("email_sent_status"),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en el pipeline: {str(e)}")
 
-
+# Segundo endpoint
 @app.get("/health")
 def health():
     """Health check para el frontend."""
