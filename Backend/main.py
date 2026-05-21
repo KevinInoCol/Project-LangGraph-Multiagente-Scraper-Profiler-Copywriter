@@ -95,8 +95,10 @@ def process_url(request: ProcessRequest):
             email_sent_status=result.get("email_sent_status"),
         )
     except ValueError as e:
+        logging.exception("ValueError en /process")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logging.exception("Error en /process")
         raise HTTPException(status_code=500, detail=f"Error en el pipeline: {str(e)}")
 
 # Segundo endpoint
