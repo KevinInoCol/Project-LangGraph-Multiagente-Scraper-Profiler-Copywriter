@@ -18,7 +18,7 @@ from typing import Any
 from apify_client import ApifyClient
 
 SALIDAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Salidas de los Agentes")
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage, SystemMessage
 
 
@@ -137,8 +137,8 @@ def clean_scraped_data(
             "Configúralo en el entorno o pásalo como openai_api_key."
         )
 
-    llm = ChatOpenAI(
-        model=model,
+    llm = init_chat_model(
+        f"openai:{model}",
         temperature=temperature,
         api_key=api_key,
     )

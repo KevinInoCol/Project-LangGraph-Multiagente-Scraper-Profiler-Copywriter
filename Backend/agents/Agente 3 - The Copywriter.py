@@ -18,9 +18,9 @@ SALIDAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Sa
 # Agregar el directorio Backend al path para importar tools
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage
-from langgraph.prebuilt import create_react_agent
+from langchain.chat_models import init_chat_model
+from langchain.messages import HumanMessage
+from langchain.agents import create_agent
 from tools.send_email import send_email
 
 
@@ -35,8 +35,8 @@ class CopywriterState(TypedDict, total=False):
     email_sent_status: str
 
 
-# --- LLM con tools bindeadas ---
-llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+# --- LLM y tools (LangChain v1: init_chat_model + create_agent) ---
+llm = init_chat_model("openai:gpt-4o", temperature=0.7)
 tools = [send_email]
 
 SYSTEM_PROMPT = """Eres un experto Copywriter de ventas B2B especializado en 'Cold Emailing'.
@@ -54,7 +54,7 @@ Reglas para redactar el email:
 - Adapta el tono al estilo indicado.
 """
 
-copywriter_agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+copywriter_agent = create_agent(model=llm, tools=tools, system_prompt=SYSTEM_PROMPT)
 
 
 def _extract_pain_points(profile_data: str) -> str:
