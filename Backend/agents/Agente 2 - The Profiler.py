@@ -14,7 +14,8 @@ from typing import Any, TypedDict
 SALIDAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Salidas de los Agentes")
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain.chat_models import init_chat_model
+from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import ChatOpenAI
 
 
 # --- Tipos para el grafo ---
@@ -25,8 +26,8 @@ class ProfilerState(TypedDict, total=False):
     url: str
 
 
-# --- Modelo y prompt (LangChain v1: init_chat_model, sin LCEL) ---
-llm = init_chat_model("openai:gpt-4o", temperature=0.0)
+# --- Cadena LCEL (definida fuera del nodo) ---
+llm = ChatOpenAI(model="gpt-4o", temperature=0.0)
 
 prompt_profiler = ChatPromptTemplate.from_template("""Analiza el siguiente contenido extraído de una website y genera un **Perfil de Negocio** estructurado.
 
@@ -46,6 +47,8 @@ prompt_profiler = ChatPromptTemplate.from_template("""Analiza el siguiente conte
 Responde en formato claro y estructurado, con secciones para cada punto. Usa únicamente la información presente en el contenido; no inventes datos.
 """)
 
+profiler_chain = prompt_profiler | llm | StrOutputParser()
+
 
 def _format_cleaned_data_for_prompt(cleaned_data: list[dict[str, Any]]) -> str:
     """Convierte la salida del Agente 1 en texto para el prompt."""
@@ -60,16 +63,16 @@ def _format_cleaned_data_for_prompt(cleaned_data: list[dict[str, Any]]) -> str:
 
 def profiler_node(state: ProfilerState) -> dict[str, str]:
     """
-    Nodo que analiza el modelo de negocio.
+    Nodo que analiza el modelo de negocio usando la cadena LCEL.
     Recibe cleaned_data del Agente 1 y devuelve profile_data.
     """
     cleaned_data = state.get("cleaned_data", [])
     website_content = _format_cleaned_data_for_prompt(cleaned_data)
 
     print("[Agente 2] Profiler ejecutando análisis...", flush=True)
-    messages = prompt_profiler.format_messages(website_content=website_content)
-    response = llm.invoke(messages)
-    profile_result = response.content
+    profile_result = profiler_chain.invoke({
+        "website_content": website_content,
+    })
     print("[Agente 2] Profiler completado", flush=True)
 
     # Guardar salida en documento para revisión
