@@ -11,11 +11,21 @@ Devuelve: profile_data (perfil de negocio para el Agente 3)
 import os
 from typing import Any, TypedDict
 
-SALIDAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Salidas de los Agentes")
+import yaml
+
+# El agente vive en agents/Agent 2/, así que subimos dos niveles hasta Backend/.
+SALIDAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Salidas de los Agentes")
+_PROMPT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompt", "prompt_instruction.yaml")
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain.chat_models import init_chat_model
+
+
+def _load_prompt() -> str:
+    """Carga el prompt desde prompt/prompt_instruction.yaml (relativo a este archivo)."""
+    with open(_PROMPT_PATH, encoding="utf-8") as f:
+        return (yaml.safe_load(f) or {})["system_prompt"]
 
 
 # --- Tipos para el grafo ---
@@ -29,23 +39,7 @@ class ProfilerState(TypedDict, total=False):
 # --- Cadena LCEL (definida fuera del nodo) ---
 llm = init_chat_model("openai:gpt-4o", temperature=0.0)
 
-prompt_profiler = ChatPromptTemplate.from_template("""Analiza el siguiente contenido extraído de una website y genera un **Perfil de Negocio** estructurado.
-
-## Contenido de la website:
-{website_content}
-
-## Tu análisis debe cubrir:
-
-1. **Puntos de Dolor / Necesidades**: ¿Qué problemas intenta resolver? ¿Qué necesidades cubre?
-
-2. **Tecnología**: ¿Qué tecnologías mencionan o utilizan? (frameworks, herramientas, integraciones, etc.)
-
-3. **Carencias / Oportunidades**: ¿Parece que les falta algo? ¿Qué podría mejorar o complementar su oferta?
-
-4. **Cliente ideal**: ¿Quién es su público objetivo? Describe el perfil del cliente ideal basándote en el contenido.
-
-Responde en formato claro y estructurado, con secciones para cada punto. Usa únicamente la información presente en el contenido; no inventes datos.
-""")
+prompt_profiler = ChatPromptTemplate.from_template(_load_prompt())
 
 profiler_chain = prompt_profiler | llm | StrOutputParser()
 

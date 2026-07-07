@@ -1,89 +1,52 @@
 """
-Agente 1 - Scraper y Data Engineer
+Agente 1 - Scraper y Data Engineer (nodo LangGraph).
 
-Este agente realiza dos funciones principales:
-1. Scrapeo: Utiliza el Website Content Crawler de Apify (apify/website-content-crawler)
-   para extraer contenido de una website.
-2. Limpieza: Pasa los datos scrapeados por una LLM (OpenAI) vía LangChain v1
-   para limpiar y normalizar el contenido.
+Este archivo es EL AGENT: contiene la inteligencia (limpieza con LLM vía
+init_chat_model), la orquestación y el nodo `data_engineer_node` para el grafo.
+
+Lo único separado es la extracción cruda con Apify, en scraper.py (no usa LLM).
+
+El nodo scrapea la URL del estado y, según `skip_cleaning`, entrega texto raw
+(rápido) o texto limpiado por LLM, guardando la salida en disco para revisión.
 
 Documentación LangChain v1: https://docs.langchain.com/oss/python/releases/langchain-v1
-Website Content Crawler: https://apify.com/apify/website-content-crawler
 """
 
+import importlib.util
 import json
 import os
 from typing import Any
 
-from apify_client import ApifyClient
-
-SALIDAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Salidas de los Agentes")
+import yaml
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage, SystemMessage
 
+# El agente vive en agents/Agent 1/, así que subimos dos niveles hasta Backend/.
+_DIR = os.path.dirname(os.path.abspath(__file__))
+SALIDAS_DIR = os.path.join(_DIR, "..", "..", "Salidas de los Agentes")
+_PROMPT_PATH = os.path.join(_DIR, "prompt", "prompt_instruction.yaml")
 
 # --- Configuración ---
-APIFY_ACTOR_ID = "apify/website-content-crawler"
 MAX_CHUNK_CHARS = 8000  # Límite aproximado para evitar exceder contexto del LLM
 
 
-def scrape_website(
-    url: str,
-    max_crawl_pages: int = 1,
-    max_crawl_depth: int | None = None,
-    use_markdown: bool = True,
-    apify_token: str | None = None,
-) -> list[dict[str, Any]]:
-    """
-    Extrae contenido de una website usando el Website Content Crawler de Apify.
+def _load_local(mod_name: str, filename: str):
+    """Carga un módulo vecino por ruta (nombre único para evitar colisiones en sys.modules)."""
+    spec = importlib.util.spec_from_file_location(mod_name, os.path.join(_DIR, filename))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore
+    return mod
 
-    Args:
-        url: URL de inicio para el crawl (ej: "https://docs.apify.com/")
-        max_crawl_pages: Número máximo de páginas a rastrear (default: 10)
-        max_crawl_depth: Profundidad máxima del crawl (opcional)
-        use_markdown: Si True, incluye el campo markdown; si False, solo text
-        apify_token: Token de Apify (o APIFY_API_TOKEN en env)
 
-    Returns:
-        Lista de diccionarios con: url, text, markdown (opcional), metadata
+# La extracción cruda (Apify, sin LLM) vive aparte en scraper.py.
+_scraper = _load_local("agente1_scraper", "scraper.py")
+scrape_website = _scraper.scrape_website
 
-    Raises:
-        ValueError: Si no hay APIFY_API_TOKEN configurado
-    """
-    token = apify_token or os.environ.get("APIFY_API_TOKEN")
-    if not token:
-        raise ValueError(
-            "Se requiere APIFY_API_TOKEN. "
-            "Configúralo en el entorno o pásalo como apify_token."
-        )
 
-    client = ApifyClient(token)
-
-    run_input: dict[str, Any] = {
-        "startUrls": [{"url": url}],
-        "maxCrawlPages": max_crawl_pages,
-    }
-    if max_crawl_depth is not None:
-        run_input["maxCrawlDepth"] = max_crawl_depth
-
-    print("[Agente 1] Iniciando scrape con Apify...", flush=True)
-    run = client.actor(APIFY_ACTOR_ID).call(run_input=run_input)
-    dataset_id = run["defaultDatasetId"] if isinstance(run, dict) else run.default_dataset_id
-    dataset = client.dataset(dataset_id)
-
-    results: list[dict[str, Any]] = []
-    for item in dataset.iterate_items():
-        entry: dict[str, Any] = {
-            "url": item.get("url", ""),
-            "text": item.get("text") or "",
-            "metadata": item.get("metadata", {}),
-        }
-        if use_markdown and item.get("markdown"):
-            entry["markdown"] = item["markdown"]
-        results.append(entry)
-
-    print(f"[Agente 1] Scrape completado: {len(results)} páginas", flush=True)
-    return results
+def _load_prompt() -> str:
+    """Carga el prompt desde prompt/prompt_instruction.yaml (relativo a este archivo)."""
+    with open(_PROMPT_PATH, encoding="utf-8") as f:
+        return (yaml.safe_load(f) or {})["system_prompt"]
 
 
 def _split_content_for_llm(content: str, max_chars: int = MAX_CHUNK_CHARS) -> list[str]:
@@ -144,18 +107,7 @@ def clean_scraped_data(
         api_key=api_key,
     )
 
-    default_system = """Eres un experto en limpieza de datos web. Tu tarea es limpiar el contenido scrapeado de una página web.
-
-Reglas:
-- Elimina elementos de interfaz residuales (ej: "Skip to main content", "On this page", enlaces de navegación)
-- Quita repeticiones innecesarias y ruido
-- Conserva el contenido sustancial: títulos, párrafos, listas, tablas en texto
-- Normaliza espacios en blanco y saltos de línea
-- Mantén la estructura lógica del contenido (títulos, subtítulos, párrafos)
-- NO inventes ni añadas información que no esté en el texto original
-- Devuelve ÚNICAMENTE el texto limpio, sin comentarios ni explicaciones"""
-
-    sys_prompt = system_prompt or default_system
+    sys_prompt = system_prompt or _load_prompt()
 
     cleaned: list[dict[str, Any]] = []
 
@@ -202,33 +154,6 @@ Reglas:
     return cleaned
 
 
-def data_engineer_node(state: dict) -> dict:
-    """
-    Nodo para LangGraph: scrapea y limpia la URL del estado.
-    Espera state con 'target_url'; opcional: max_crawl_pages, my_service_info, company_tone.
-    Devuelve {'cleaned_data': list[dict]}.
-    """
-    url = state.get("target_url", "")
-    if not url:
-        return {"cleaned_data": []}
-    max_pages = state.get("max_crawl_pages", 10)
-    max_depth = state.get("max_crawl_depth", 3)
-    skip_cleaning = state.get("skip_cleaning", True)  # True por defecto para evitar timeout
-    results = run_scraper_and_clean(url=url, max_crawl_pages=max_pages, max_crawl_depth=max_depth, skip_cleaning=skip_cleaning)
-
-    # Guardar salida en documento para revisión
-    run_id = state.get("run_id")
-    if run_id:
-        run_dir = os.path.join(SALIDAS_DIR, run_id)
-        os.makedirs(run_dir, exist_ok=True)
-        out_path = os.path.join(run_dir, "agente1_datos_limpios.json")
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2, default=str)
-        print(f"[Agente 1] Guardado: {out_path}", flush=True)
-
-    return {"cleaned_data": results}
-
-
 def run_scraper_and_clean(
     url: str,
     max_crawl_pages: int = 10,
@@ -263,6 +188,33 @@ def run_scraper_and_clean(
             for item in scraped
         ]
     return clean_scraped_data(scraped_items=scraped, model=model, **kwargs)
+
+
+def data_engineer_node(state: dict) -> dict:
+    """
+    Nodo para LangGraph: scrapea y limpia la URL del estado.
+    Espera state con 'target_url'; opcional: max_crawl_pages, my_service_info, company_tone.
+    Devuelve {'cleaned_data': list[dict]}.
+    """
+    url = state.get("target_url", "")
+    if not url:
+        return {"cleaned_data": []}
+    max_pages = state.get("max_crawl_pages", 10)
+    max_depth = state.get("max_crawl_depth", 3)
+    skip_cleaning = state.get("skip_cleaning", True)  # True por defecto para evitar timeout
+    results = run_scraper_and_clean(url=url, max_crawl_pages=max_pages, max_crawl_depth=max_depth, skip_cleaning=skip_cleaning)
+
+    # Guardar salida en documento para revisión
+    run_id = state.get("run_id")
+    if run_id:
+        run_dir = os.path.join(SALIDAS_DIR, run_id)
+        os.makedirs(run_dir, exist_ok=True)
+        out_path = os.path.join(run_dir, "agente1_datos_limpios.json")
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2, default=str)
+        print(f"[Agente 1] Guardado: {out_path}", flush=True)
+
+    return {"cleaned_data": results}
 
 
 # --- Ejemplo de uso ---

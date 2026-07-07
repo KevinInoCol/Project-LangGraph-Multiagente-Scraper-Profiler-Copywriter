@@ -14,3 +14,10 @@ dist/
 
 # IDE
 .vscode/
+
+# Claude Code (config local de la máquina; las reglas en .claude/rules/ sí se versionan)
+.claude/settings.local.json
+Backend/.claude/
+
+# Salidas de ejecución de los agentes (outputs por run_id, no versionar)
+Backend/Salidas de los Agentes/

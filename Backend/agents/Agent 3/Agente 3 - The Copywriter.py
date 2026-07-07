@@ -13,15 +13,25 @@ import re
 import sys
 from typing import TypedDict
 
-SALIDAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Salidas de los Agentes")
+import yaml
 
-# Agregar el directorio Backend al path para importar tools
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+# El agente vive en agents/Agent 3/, así que subimos dos niveles hasta Backend/.
+SALIDAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Salidas de los Agentes")
+_PROMPT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompt", "prompt_instruction.yaml")
+
+# Agregar el directorio Backend al path para importar tools (dos niveles arriba)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from tools.send_email import send_email
+
+
+def _load_prompt() -> str:
+    """Carga el prompt desde prompt/prompt_instruction.yaml (relativo a este archivo)."""
+    with open(_PROMPT_PATH, encoding="utf-8") as f:
+        return (yaml.safe_load(f) or {})["system_prompt"]
 
 
 # --- Tipos para el grafo ---
@@ -36,25 +46,14 @@ class CopywriterState(TypedDict, total=False):
 
 
 # --- LLM con tools bindeadas ---
+# init_chat_model se mantiene porque create_agent NO acepta temperature como
+# parámetro; la temperatura se fija al inicializar el modelo y se pasa la instancia.
 llm = init_chat_model("openai:gpt-4o", temperature=0.7)
 tools = [send_email]
 
-SYSTEM_PROMPT = """Eres un experto Copywriter de ventas B2B especializado en 'Cold Emailing'.
-Tienes acceso a la herramienta send_email para enviar correos electrónicos.
+SYSTEM_PROMPT = _load_prompt()
 
-Tu flujo de trabajo es:
-1. Primero, genera el cold email basándote en la información del prospecto.
-2. Luego, si se te proporciona un email de destinatario, usa la herramienta send_email para enviarlo.
-
-Reglas para redactar el email:
-- Empieza con un 'Icebreaker' genuino sobre algo específico que encontraste en su web.
-- Menciona el problema (Punto de dolor) usando sus propias palabras si es posible.
-- Presenta la solución de IA como el alivio natural a ese dolor.
-- Call to Action (CTA) de bajo compromiso (ej: '¿Te envío un video de 3 min?').
-- Adapta el tono al estilo indicado.
-"""
-
-copywriter_agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+copywriter_agent = create_agent(model=llm, tools=tools, system_prompt=SYSTEM_PROMPT)
 
 
 def _extract_pain_points(profile_data: str) -> str:

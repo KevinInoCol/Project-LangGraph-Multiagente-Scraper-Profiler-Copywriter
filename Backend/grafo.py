@@ -24,9 +24,9 @@ def _load_agent(module_name: str, file_path: str):
     return mod
 
 
-_agente1 = _load_agent("agente1", "agents/Agente 1 - Scraper y Data Engineer.py")
-_agente2 = _load_agent("agente2", "agents/Agente 2 - The Profiler.py")
-_agente3 = _load_agent("agente3", "agents/Agente 3 - The Copywriter.py")
+_agente1 = _load_agent("agente1", "agents/Agent 1/Agent_1_scraper_and_data_engineer.py")
+_agente2 = _load_agent("agente2", "agents/Agent 2/Agente 2 - The Profiler.py")
+_agente3 = _load_agent("agente3", "agents/Agent 3/Agente 3 - The Copywriter.py")
 
 data_engineer_node = _agente1.data_engineer_node
 profiler_node = _agente2.profiler_node
