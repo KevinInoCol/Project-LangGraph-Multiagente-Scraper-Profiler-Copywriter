@@ -21,3 +21,6 @@ Backend/.claude/
 
 # Salidas de ejecución de los agentes (outputs por run_id, no versionar)
 Backend/Salidas de los Agentes/
+
+# Estado local del dev server de LangGraph (pickles, no versionar)
+Backend/.langgraph_api/

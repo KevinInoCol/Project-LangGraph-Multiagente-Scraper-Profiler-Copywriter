@@ -1,4 +1,4 @@
-# Backend
+# ====================== Backend =====================
 
 ```bash
 conda create -n LangGraph-Perfilador-Copywriter python=3.11 -y
@@ -25,7 +25,7 @@ docker buildx build \
   .
 ```
 
-# Frontend
+# ===================== Frontend ========================
 
 ```bash
 cd Frontend

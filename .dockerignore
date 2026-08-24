@@ -1,0 +1,17 @@
+# Solo se necesita Backend/ para la imagen
+Frontend/
+.git/
+.claude/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+
+# Secretos y estado local (usar variables de entorno en Cloud Run)
+**/.env
+Backend/.langgraph_api/
+Backend/Salidas de los Agentes/
+
+# OS
+.DS_Store

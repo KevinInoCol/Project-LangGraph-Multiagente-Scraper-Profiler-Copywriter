@@ -1,0 +1,39 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: servicio-backend-langgraph-multiagente-nombre-apellido
+spec:
+  template:
+    spec:
+      containers:
+        - image: us-central1-docker.pkg.dev/datapath-ai17-kevin-inofuente/repositorio-backend-langgraph-multiagente/image-backend-langgraph-multiagente:v1
+          env:
+            # Credenciales via Secret Manager (los valores nunca entran al repo).
+            # Los agentes 2 y 3 instancian el LLM al importarse: sin OPENAI_API_KEY
+            # el contenedor muere antes de escuchar en el puerto.
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: OPENAI_API_KEY
+                  key: latest
+            - name: APIFY_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: APIFY_API_TOKEN
+                  key: latest
+            - name: APP_PASSWORD_GMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: APP_PASSWORD_GMAIL
+                  key: latest
+            # No es una credencial, va en claro. <-- COMPLETAR
+            - name: EMAIL_REMITENTE
+              value: "kevin.inofuente.colque.27@gmail.com"
+          resources:
+            limits:
+              # langchain + langgraph + langchain-openai no entran en los 512Mi
+              # por defecto de Cloud Run.
+              memory: 1Gi
+              cpu: "1"
+          ports:
+            - containerPort: 4000

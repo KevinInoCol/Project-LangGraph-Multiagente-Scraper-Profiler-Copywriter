@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=True
+
+# set the working directory
+WORKDIR /usr/src/app
+
+# install dependencies
+COPY ./Backend/requirements.txt ./
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# El Backend usa imports planos (main.py -> `from grafo import app`),
+# por eso el contenido de Backend/ se copia en la raiz del WORKDIR.
+ENV PYTHONPATH=/usr/src/app
+
+# copy backend code
+COPY ./Backend ./
+
+EXPOSE 4000
+
+# start the server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "4000", "--proxy-headers"]

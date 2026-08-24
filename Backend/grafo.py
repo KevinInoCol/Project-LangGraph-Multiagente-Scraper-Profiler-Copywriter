@@ -8,11 +8,17 @@ import importlib.util
 import os
 from typing import Any, TypedDict
 
+from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 
 
 # --- Carga de módulos (los archivos tienen espacios en el nombre) ---
 _BASE = os.path.dirname(os.path.abspath(__file__))
+
+# Cargar .env al importar el grafo. Necesario para `langgraph dev`, que importa
+# grafo:app directamente (sin pasar por main.py, que es quien llama load_dotenv).
+# Los agentes crean el LLM en import-time, así que el .env debe estar cargado antes.
+load_dotenv(os.path.join(_BASE, ".env"))
 
 
 def _load_agent(module_name: str, file_path: str):
